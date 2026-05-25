@@ -1,0 +1,114 @@
+Managing Images
+
+docker images -q: Lists of all images.
+docker ps: list of running containers.
+docker ps -a: list of all(running and stopped) containers.
+docker image prune: Removes unused images.
+docker image rm <image_name>:<tag>: Removes an image.
+docker system prune: [
+  - all stopped containers
+  - all networks not used by at least one container
+  - all images without at least one container associated to them
+  - all build cache
+]
+docker system prune -a: This command removes everything that docker system
+
+docker build -t rempms-candidate-service:0.0.1 .
+docker login
+Username: <your_username>
+Password: <your_password_or_token>
+if not work:
+docker tag rempms-api-gateway-service:0.0.1 <your_username>/rempms-api-gateway-service:0.0.1
+docker push <your_username>/rempms-api-gateway-service:0.0.1
+
+docker pull <image_name>:<tag>: Pulls an image from a registry (e.g., Docker Hub).
+
+Managing Volumes
+docker volume ls: Lists volumes.
+docker volume create <volume_name>: Creates a volume.
+docker volume rm <volume_name>: Removes a volume.
+docker volume prune: Removes unused volumes.
+
+Managing Containers
+docker network create my-network
+docker network connect my-network container1
+docker network connect my-network container2
+
+docker start <container_name>: Starts a stopped container.
+docker stop <container_name>: Stops a running container.
+docker restart <container_name>: Restarts a running container.
+docker rm <container_name>: Removes a stopped container.
+docker rm $(docker ps -aq): Removes all stopped containers.
+docker exec -it <container_name> <command>: Executes a command inside a running container.
+docker attach <container_name>: Attaches to a running container's standard input, output, and error streams.
+
+
+Networking
+docker network ls: Lists networks.
+docker network create <network_name>: Creates a network.
+docker network rm <network_name>: Removes a network.
+docker network connect <network_name> <container_name>: Connects a container to a network.
+docker network disconnect <network_name> <container_name>: Disconnects a container from a network.
+
+Database 
+
+docker exec -it mongodb mongosh --username root --password root_password --authenticationDatabase admin
+
+use rempms-draft;
+db.createUser({
+  user: "mongo",
+  pwd: "123",
+  roles: [
+    { role: "readWrite", db: "rempms-draft" }
+  ]
+});
+use rempms-draft;
+db.createCollection("common_profile_draft");
+db.common_profile_draft.find().pretty();
+db.common_profile_draft.drop();
+db.common_profile_draft.deleteMany({});
+db.common_profile_draft.countDocuments();
+
+
+|------------------------------------------------ Restore postgres database to container started ------------------------------------------------|
+
+docker cp "C:\Users\User\OneDrive\Desktop\bckup_dumps\dump-pdev_user_management-202508232223.sql" postgresqldb:/tmp/dump.sql
+docker exec -it postgresqldb ls /tmp
+docker exec -it postgresqldb psql -U postgres -d postgres -c "CREATE DATABASE pdev_user_management;"
+docker exec -it postgresqldb pg_restore -U postgres -d pdev_user_management /tmp/dump.sql
+
+// Connect to the database
+docker exec -it postgresqldb psql -U postgres
+\l
+\q
+\c rempms_recruitment : connect to the database 
+\dt
+
+|------------------------------------------------ Restore postgres database to container ended ------------------------------------------------|
+
+
+docker run --name mymongodb -d -p27017:27017 -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=123 a00c3746346c
+docker exec -it mymongodb mongosh -u admin -p 123 --authenticationDatabase admin
+
+docker cp "C:\Users\User\OneDrive\Desktop\bckup_dumps\dump-pdev_user_management-202508232223.sql" postgresqldb:/dump.sql
+docker exec -it postgresqldb pg_restore -U postgres -d pdev_user_management /dump-pdev_user_management-202508232223.sql
+
+direct mount: docker exec -i <container_name> psql -U <username> -d <database_name> < /path/to/your/file.sql
+
+
+Other Useful Commands
+docker system df: Displays disk usage of Docker.
+docker info: Displays system-wide information.
+docker logs <container_name>: Displays logs of a container.
+docker inspect <container_name>: Displays detailed information about a container.
+docker save <image_name>:<tag> -o <filename.tar>: Saves an image to a tar file.
+docker load <filename.tar>: Loads an image from a tar file.
+
+Remember to replace <image_name>, <tag>, <container_name>, and <volume_name> with the actual names.
+
+docker run -d -p8201:8201 --name pdev-kcs-service -e POSTGRES_SERVER_ADDRESS=mypostgresqldb -e CONSUL_SERVER_ADDRESS=consul ff4f4f4cf220
+docker run -d -8888:8888 --name pdev-keycloak-service -e POSTGRES_SERVER_ADDRESS=mypostgresqldb -e CONSUL_SERVER_ADDRESS=consul 886a120f4122
+docker run -d -p8185:8185 --name rempms-location-service -e POSTGRES_SERVER_ADDRESS=mypostgresqldb -e CONSUL_SERVER_ADDRESS=consul a69b8b5df1bd
+docker run -d -p8199:8198 --name rempms-draft-service -e MONGODB_SERVER_ADDRESS=mymongodb -e CONSUL_SERVER_ADDRESS=consul 07626f97a96c
+docker run -d -p8197:8197 --name rempms-document-service -e POSTGRES_SERVER_ADDRESS=mypostgresqldb -e CONSUL_SERVER_ADDRESS=consul d6a4af9b10b7
+docker run -d -p8184:8184 --name rempms-communication-service -e POSTGRES_SERVER_ADDRESS=mypostgresqldb -e CONSUL_SERVER_ADDRESS=consul 845f75d4a765

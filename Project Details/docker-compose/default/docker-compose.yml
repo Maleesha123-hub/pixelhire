@@ -1,0 +1,771 @@
+name: rempms
+
+volumes:
+  postgres-s-data:
+    name: postgres-s-data
+    driver: local
+  mongo-s-data: 
+    name: mongo-s-data
+    driver: local
+  document-data:
+    name: document-data
+    driver: local
+  kafka-kraft-data:
+    name: kafka-kraft-data
+    driver: local
+    
+services:
+  # read:
+    # image: grafana/loki:latest
+    # command: "-config.file=/etc/loki/config.yaml -target=read"
+    # ports:
+      # - 3101:3100
+      # - 7946
+      # - 9095
+    # volumes:
+      # - ../observability/loki/loki-config.yaml:/etc/loki/config.yaml
+    # depends_on:
+      # - minio
+    # healthcheck:
+      # test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1" ]
+      # interval: 10s
+      # timeout: 5s
+      # retries: 5
+    # networks: &loki-dns
+      # rempms-shared-network:
+        # aliases:
+          # - loki
+
+  # write:
+    # image: grafana/loki:latest
+    # command: "-config.file=/etc/loki/config.yaml -target=write"
+    # ports:
+      # - 3102:3100
+      # - 7946
+      # - 9095
+    # volumes:
+      # - ../observability/loki/loki-config.yaml:/etc/loki/config.yaml
+    # healthcheck:
+      # test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1" ]
+      # interval: 10s
+      # timeout: 5s
+      # retries: 5
+    # depends_on:
+      # - minio
+    # networks:
+      # <<: *loki-dns
+
+  # alloy:
+    # image: grafana/alloy:latest
+    # volumes:
+      # - ../observability/alloy/alloy-local-config.yaml:/etc/alloy/config.alloy:ro
+      # - /var/run/docker.sock:/var/run/docker.sock
+    # command:  run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    # ports:
+      # - 12345:12345
+    # depends_on:
+      # - gateway
+    # networks:
+      # - rempms-shared-network
+
+  # minio:
+    # image: minio/minio
+    # entrypoint:
+      # - sh
+      # - -euc
+      # - |
+        # mkdir -p /data/loki-data && \
+        # mkdir -p /data/loki-ruler && \
+        # minio server /data
+    # environment:
+      # - MINIO_ROOT_USER=loki
+      # - MINIO_ROOT_PASSWORD=supersecret
+      # - MINIO_PROMETHEUS_AUTH_TYPE=public
+      # - MINIO_UPDATE=off
+    # ports:
+      # - 9000
+    # volumes:
+      # - ./.data/minio:/data
+    # healthcheck:
+      # test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      # interval: 15s
+      # timeout: 20s
+      # retries: 5
+    # networks:
+      # - rempms-shared-network
+
+  # prometheus:
+    # image: prom/prometheus:latest
+    # container_name: prometheus
+    # ports:
+      # - "9090:9090"
+    # volumes:
+      # - ../observability/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yml
+    # networks:
+      # - rempms-shared-network
+
+  # tempo:
+    # image: grafana/tempo:2.6.1
+    # container_name: tempo
+    # command: -config.file /etc/tempo-config.yml
+    # ports:
+      # - "3110:3100"
+      # - "4318:4318"
+    # volumes:
+      # - ../observability/tempo/tempo.yaml:/etc/tempo-config.yml
+    # networks:
+      # - rempms-shared-network
+
+  # grafana:
+    # image: grafana/grafana:latest
+    # environment:
+      # - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      # - GF_AUTH_ANONYMOUS_ENABLED=true
+      # - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    # depends_on:
+      # - gateway
+    # entrypoint:
+      # - sh
+      # - -euc
+      # - |
+        # /run.sh
+    # ports:
+      # - "3000:3000"
+    # volumes:
+      # - ../observability/grafana/datasource.yaml:/etc/grafana/provisioning/datasources/datasource.yml
+    # healthcheck:
+      # test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1" ]
+      # interval: 10s
+      # timeout: 5s
+      # retries: 5
+    # networks:
+      # - rempms-shared-network
+
+  # backend:
+    # image: grafana/loki:latest
+    # volumes:
+      # - ../observability/loki/loki-config.yaml:/etc/loki/config.yaml
+    # ports:
+      # - "3100"
+      # - "7946"
+    # command: "-config.file=/etc/loki/config.yaml -target=backend -legacy-read-mode=false"
+    # depends_on:
+      # - gateway
+    # networks:
+      # - rempms-shared-network
+    
+  # gateway:
+    # image: nginx:latest
+    # depends_on:
+      # - read
+      # - write
+    # entrypoint:
+      # - sh
+      # - -euc
+      # - |
+        # cat <<EOF > /etc/nginx/nginx.conf
+        # user  nginx;
+        # worker_processes  5;  ## Default: 1
+
+        # events {
+          # worker_connections   1000;
+        # }
+
+        # http {
+          # resolver 127.0.0.11;
+
+          # server {
+            # listen             3100;
+
+            # location = / {
+              # return 200 'OK';
+              # auth_basic off;
+            # }
+
+            # location = /api/prom/push {
+              # proxy_pass       http://write:3100\$$request_uri;
+            # }
+
+            # location = /api/prom/tail {
+              # proxy_pass       http://read:3100\$$request_uri;
+              # proxy_set_header Upgrade \$$http_upgrade;
+              # proxy_set_header Connection "upgrade";
+            # }
+
+            # location ~ /api/prom/.* {
+              # proxy_pass       http://read:3100\$$request_uri;
+            # }
+
+            # location = /loki/api/v1/push {
+              # proxy_pass       http://write:3100\$$request_uri;
+            # }
+
+            # location = /loki/api/v1/tail {
+              # proxy_pass       http://read:3100\$$request_uri;
+              # proxy_set_header Upgrade \$$http_upgrade;
+              # proxy_set_header Connection "upgrade";
+            # }
+
+            # location ~ /loki/api/.* {
+              # proxy_pass       http://read:3100\$$request_uri;
+            # }
+          # }
+        # }
+        # EOF
+        # /docker-entrypoint.sh nginx -g "daemon off;"
+    # ports:
+      # - "3100:3100"
+    # healthcheck:
+      # test: ["CMD", "service", "nginx", "status"]
+      # interval: 10s
+      # timeout: 5s
+      # retries: 5
+    # networks:
+      # - rempms-shared-network
+      
+  # postgresqldb:
+    # image: 'bitnamilegacy/postgresql:17.5.0'
+    # container_name: 'postgresqldb'
+    # ports:
+      # - '5432:5432'
+    # volumes:
+      # - postgres-s-data:/bitnami/postgresql:rw # rw: Read-write(Default) | ro: Read-only(Safer)
+    # healthcheck:
+      # test: ["CMD", "pg_isready", "-U", "postgres"]
+      # interval: 20s
+      # timeout: 5s
+      # retries: 20
+    # environment:
+      # POSTGRESQL_USERNAME: postgres       
+      # POSTGRESQL_PASSWORD: rempmsprod@123  
+    # networks:
+      # - rempms-shared-network
+            
+  # mongodb:
+    # image: 'mongo:8.0.9'
+    # container_name: 'mongodb'
+    # ports:
+      # - '27017:27017'
+    # volumes:
+      # - mongo-s-data:/data/db:rw
+    # healthcheck:
+      # test: ["CMD", "mongosh", "--eval", "db.runCommand({ hello: 1 })"]
+      # interval: 20s
+      # timeout: 5s
+      # retries: 20
+    # networks:
+      # - rempms-shared-network
+      
+  rempms-kafka:
+    image: docker.io/bitnamilegacy/kafka:3.9
+    container_name: rempms-kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"  # controller communication (internal only)
+      - "9094:9094"  # external access (Spring Boot running on host)
+    volumes:
+      - kafka-kraft-data:/bitnami/kafka-data
+    environment:
+      # === KRaft (no ZooKeeper) ===
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@rempms-kafka:9093
+
+      # === Listeners ===
+      # internal (Docker network) + external (localhost)
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://rempms-kafka:9092,EXTERNAL://localhost:9094
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+
+      # === Misc ===
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+    networks:
+      - rempms-shared-network
+
+  rempms-kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: rempms-kafka-ui
+    ports:
+      - "9517:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=rempms-kafka:9092
+    depends_on:
+      - rempms-kafka
+    networks:
+      - rempms-shared-network
+
+  # rempms-rabbitmq:
+    # image: "rabbitmq:4-management"
+    # container_name: rempms-rabbitmq
+    # ports:
+      # - "5672:5672"
+      # - "15672:15672"
+    # healthcheck:
+      # test: ["CMD", "rabbitmqctl", "status"]
+      # interval: 20s
+      # timeout: 5s
+      # retries: 20
+      # start_period: 5s
+    # networks:
+      # - rempms-shared-network
+      
+  # rempms-configuration-service:
+    # image: "maleeshasa/rempms-configuration-service:v4-LTS"
+    # container_name: rempms-configuration-service
+    # ports:
+      # - "8071:8071"
+    # healthcheck:
+      # test: "curl --fail --silent localhost:8071/actuator/health/readiness | grep UP || exit 1"
+      # interval: 20s
+      # timeout: 5s
+      # retries: 20
+      # start_period: 10s
+    # depends_on:
+      # rempms-rabbitmq:
+        # condition: service_healthy
+    # environment:
+      # SPRING_PROFILES_ACTIVE: default
+      # SPRING_APPLICATION_NAME: rempms-configuration-service
+      # SPRING_RABBITMQ_HOST: rempms-rabbitmq
+      # JAVA_TOOL_OPTIONS: "-javaagent:/app/libs/opentelemetry-javaagent-2.11.0.jar"
+      # OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+      # OTEL_METRICS_EXPORTER: none
+      # OTEL_LOGS_EXPORTER: none
+      # OTEL_SERVICE_NAME: "rempms-configuration-service"
+    # networks:
+      # - rempms-shared-network
+
+  # rempms-eureka-service:
+    # image: "maleeshasa/rempms-eureka-service:v4-LTS"
+    # container_name: rempms-eureka-service
+    # ports:
+      # - "8070:8070"
+    # healthcheck:
+      # test: "curl --fail --silent localhost:8070/actuator/health/readiness | grep UP || exit 1"
+      # interval: 20s
+      # timeout: 5s
+      # retries: 20
+      # start_period: 10s
+    # depends_on:
+      # rempms-rabbitmq:
+        # condition: service_healthy
+      # rempms-configuration-service:
+        # condition: service_healthy
+    # environment:
+      # SPRING_PROFILES_ACTIVE: default
+      # SPRING_APPLICATION_NAME: rempms-eureka-service
+      # EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://rempms-eureka-service:8070/eureka/
+      # EUREKA_INSTANCE_HOSTNAME: rempms-eureka-service
+      # SPRING_RABBITMQ_HOST: rempms-rabbitmq
+      # CONFIG_SERVER_URL: http://rempms-configuration-service:8071/
+      # JAVA_TOOL_OPTIONS: "-javaagent:/app/libs/opentelemetry-javaagent-2.11.0.jar"
+      # OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+      # OTEL_METRICS_EXPORTER: none
+      # OTEL_LOGS_EXPORTER: none
+      # OTEL_SERVICE_NAME: "rempms-eureka-service"
+    # networks:
+      # - rempms-shared-network
+      
+  # rempms-api-gateway-service:
+    # image: "maleeshasa/rempms-api-gateway-service:v4-LTS"
+    # container_name: rempms-api-gateway-service
+    # ports:
+      # - "8081:8081"
+    # healthcheck:
+      # test: "curl --fail --silent localhost:8081/actuator/health/readiness | grep UP || exit 1"
+      # interval: 20s
+      # timeout: 20s
+      # retries: 20
+      # start_period: 10s
+    # depends_on:
+      # rempms-rabbitmq:
+        # condition: service_healthy
+      # rempms-eureka-service:
+        # condition: service_healthy
+      # rempms-configuration-service:
+        # condition: service_healthy
+    # environment:
+      # SPRING_PROFILES_ACTIVE: default
+      # SPRING_APPLICATION_NAME: rempms-api-gateway-service
+      # EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://rempms-eureka-service:8070/eureka/
+      # SPRING_RABBITMQ_HOST: rempms-rabbitmq
+      # CONFIG_SERVER_URL: http://rempms-configuration-service:8071/
+      # JAVA_TOOL_OPTIONS: "-javaagent:/app/libs/opentelemetry-javaagent-2.11.0.jar"
+      # OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+      # OTEL_METRICS_EXPORTER: none
+      # OTEL_LOGS_EXPORTER: none
+      # OTEL_SERVICE_NAME: "rempms-api-gateway-service"
+    # networks:
+      # - rempms-shared-network
+
+  # pdev-user-service:
+    # image: "maleeshasa/pdev-user-service:v4-LTS"
+    # container_name: pdev-user-service
+    # ports:
+      # - "9001:9001"
+    # healthcheck:
+      # test: "curl --fail --silent localhost:9001/actuator/health/readiness | grep UP || exit 1"
+      # interval: 20s
+      # timeout: 20s
+      # retries: 20
+      # start_period: 10s
+    # depends_on:
+      # rempms-rabbitmq:
+        # condition: service_healthy
+      # rempms-eureka-service:
+        # condition: service_healthy
+      # rempms-configuration-service:
+        # condition: service_healthy
+    # environment:
+      # SPRING_PROFILES_ACTIVE: prod
+      # SPRING_APPLICATION_NAME: pdev-user-service
+      # EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://rempms-eureka-service:8070/eureka/
+      # SPRING_RABBITMQ_HOST: rempms-rabbitmq
+      # POSTGRES_SERVER_ADDRESS: postgresqldb
+      # CONFIG_SERVER_URL: http://rempms-configuration-service:8071/
+      # JAVA_TOOL_OPTIONS: "-javaagent:/app/libs/opentelemetry-javaagent-2.11.0.jar"
+      # OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+      # OTEL_METRICS_EXPORTER: none
+      # OTEL_LOGS_EXPORTER: none
+      # OTEL_SERVICE_NAME: "pdev-user-service"
+      # SPRING_CLOUD_STREAM_KAFKA_BINDER_BROKERS: "rempms-kafka:9092"
+    # networks:
+      # - rempms-shared-network
+
+  # pdev-keycloak-service:
+    # image: "maleeshasa/pdev-keycloak-service:v4-LTS"
+    # container_name: pdev-keycloak-service
+    # ports:
+      # - "8823:8823"
+    # healthcheck:
+      # test: "curl --fail --silent localhost:8823/actuator/health/readiness | grep UP || exit 1"
+      # interval: 20s
+      # timeout: 20s
+      # retries: 20
+      # start_period: 10s
+    # depends_on:
+      # rempms-rabbitmq:
+        # condition: service_healthy
+      # rempms-eureka-service:
+        # condition: service_healthy
+      # rempms-configuration-service:
+        # condition: service_healthy
+      # postgresqldb:
+        # condition: service_healthy
+    # environment:
+      # SPRING_PROFILES_ACTIVE: prod
+      # SPRING_APPLICATION_NAME: pdev-keycloak-service
+      # EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://rempms-eureka-service:8070/eureka/
+      # SPRING_RABBITMQ_HOST: rempms-rabbitmq
+      # POSTGRES_SERVER_ADDRESS: postgresqldb
+      # CONFIG_SERVER_URL: http://rempms-configuration-service:8071/
+      # JAVA_TOOL_OPTIONS: "-javaagent:/app/libs/opentelemetry-javaagent-2.11.0.jar"
+      # OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+      # OTEL_METRICS_EXPORTER: none
+      # OTEL_LOGS_EXPORTER: none
+      # OTEL_SERVICE_NAME: "pdev-keycloak-service"
+    # networks:
+      # - rempms-shared-network
+
+  # pdev-kcs-service:
+    # image: "maleeshasa/pdev-kcs-service:v4-LTS"
+    # container_name: pdev-kcs-service
+    # ports:
+      # - "8201:8201"
+    # healthcheck:
+      # test: "curl --fail --silent localhost:8201/actuator/health/readiness | grep UP || exit 1"
+      # interval: 20s
+      # timeout: 20s
+      # retries: 20
+      # start_period: 10s
+    # depends_on:
+      # rempms-rabbitmq:
+        # condition: service_healthy
+      # rempms-eureka-service:
+        # condition: service_healthy
+      # rempms-configuration-service:
+        # condition: service_healthy
+      # postgresqldb:
+        # condition: service_healthy
+    # environment:
+      # SPRING_PROFILES_ACTIVE: prod
+      # SPRING_APPLICATION_NAME: pdev-kcs-service
+      # EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://rempms-eureka-service:8070/eureka/
+      # POSTGRES_SERVER_ADDRESS: postgresqldb
+      # CONFIG_SERVER_URL: http://rempms-configuration-service:8071/
+    # networks:
+      # - rempms-shared-network
+
+  # rempms-candidate-service:
+    # image: "maleeshasa/rempms-candidate-service:v4-LTS"
+    # container_name: rempms-candidate-service
+    # ports:
+      # - "8088:8088"
+    # healthcheck:
+      # test: "curl --fail --silent localhost:8088/actuator/health/readiness | grep UP || exit 1"
+      # interval: 20s
+      # timeout: 20s
+      # retries: 20
+      # start_period: 10s
+    # depends_on:
+      # rempms-rabbitmq:
+        # condition: service_healthy
+      # rempms-eureka-service:
+        # condition: service_healthy
+      # rempms-configuration-service:
+        # condition: service_healthy
+      # postgresqldb:
+        # condition: service_healthy
+    # environment:
+      # SPRING_PROFILES_ACTIVE: prod
+      # SPRING_APPLICATION_NAME: rempms-candidate-service
+      # EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://rempms-eureka-service:8070/eureka/
+      # SPRING_RABBITMQ_HOST: rempms-rabbitmq
+      # POSTGRES_SERVER_ADDRESS: postgresqldb
+      # CONFIG_SERVER_URL: http://rempms-configuration-service:8071/
+      # JAVA_TOOL_OPTIONS: "-javaagent:/app/libs/opentelemetry-javaagent-2.11.0.jar"
+      # OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+      # OTEL_METRICS_EXPORTER: none
+      # OTEL_LOGS_EXPORTER: none
+      # OTEL_SERVICE_NAME: "rempms-candidate-service"
+    # networks:
+      # - rempms-shared-network
+      
+  # rempms-communication-service:
+    # image: "maleeshasa/rempms-communication-service:v4-LTS"
+    # container_name: rempms-communication-service
+    # ports:
+      # - "8083:8083"
+    # healthcheck:
+      # test: "curl --fail --silent localhost:8083/actuator/health/readiness | grep UP || exit 1"
+      # interval: 20s
+      # timeout: 20s
+      # retries: 20
+      # start_period: 10s
+    # depends_on:
+      # rempms-rabbitmq:
+        # condition: service_healthy
+      # rempms-eureka-service:
+        # condition: service_healthy
+      # rempms-configuration-service:
+        # condition: service_healthy
+      # postgresqldb:
+        # condition: service_healthy
+    # environment:
+      # SPRING_PROFILES_ACTIVE: prod
+      # SPRING_APPLICATION_NAME: rempms-communication-service
+      # EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://rempms-eureka-service:8070/eureka/
+      # SPRING_RABBITMQ_HOST: rempms-rabbitmq
+      # POSTGRES_SERVER_ADDRESS: postgresqldb
+      # CONFIG_SERVER_URL: http://rempms-configuration-service:8071/
+      # JAVA_TOOL_OPTIONS: "-javaagent:/app/libs/opentelemetry-javaagent-2.11.0.jar"
+      # OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+      # OTEL_METRICS_EXPORTER: none
+      # OTEL_LOGS_EXPORTER: none
+      # OTEL_SERVICE_NAME: "rempms-communication-service"
+    # networks:
+      # - rempms-shared-network
+                
+  # rempms-document-service:
+    # image: "maleeshasa/rempms-document-service:v4-LTS"
+    # container_name: rempms-document-service
+    # ports:
+      # - "8087:8087"
+    # healthcheck:
+      # test: "curl --fail --silent localhost:8087/actuator/health/readiness | grep UP || exit 1"
+      # interval: 20s
+      # timeout: 20s
+      # retries: 20
+      # start_period: 10s
+    # depends_on:
+      # rempms-rabbitmq:
+        # condition: service_healthy
+      # rempms-eureka-service:
+        # condition: service_healthy
+      # rempms-configuration-service:
+        # condition: service_healthy
+      # postgresqldb:
+        # condition: service_healthy
+    # environment:
+      # SPRING_PROFILES_ACTIVE: prod
+      # SPRING_APPLICATION_NAME: rempms-document-service
+      # EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://rempms-eureka-service:8070/eureka/
+      # SPRING_RABBITMQ_HOST: rempms-rabbitmq
+      # POSTGRES_SERVER_ADDRESS: postgresqldb
+      # CONFIG_SERVER_URL: http://rempms-configuration-service:8071/
+      # JAVA_TOOL_OPTIONS: "-javaagent:/app/libs/opentelemetry-javaagent-2.11.0.jar"
+      # OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+      # OTEL_METRICS_EXPORTER: none
+      # OTEL_LOGS_EXPORTER: none
+      # OTEL_SERVICE_NAME: "rempms-document-service"
+    # networks:
+      # - rempms-shared-network
+
+  # rempms-draft-service:
+    # image: "maleeshasa/rempms-draft-service:v4-LTS"
+    # container_name: rempms-draft-service
+    # ports:
+      # - "8186:8186"
+    # healthcheck:
+      # test: "curl --fail --silent localhost:8186/actuator/health/readiness | grep UP || exit 1"
+      # interval: 20s
+      # timeout: 20s
+      # retries: 20
+      # start_period: 10s
+    # depends_on:
+      # rempms-rabbitmq:
+        # condition: service_healthy
+      # rempms-eureka-service:
+        # condition: service_healthy
+      # rempms-configuration-service:
+        # condition: service_healthy
+      # mongodb:
+        # condition: service_healthy
+    # environment:
+      # SPRING_PROFILES_ACTIVE: prod
+      # SPRING_APPLICATION_NAME: rempms-draft-service
+      # EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://rempms-eureka-service:8070/eureka/
+      # SPRING_RABBITMQ_HOST: rempms-rabbitmq
+      # MONGODB_SERVER_ADDRESS: mongodb
+      # CONFIG_SERVER_URL: http://rempms-configuration-service:8071/
+      # JAVA_TOOL_OPTIONS: "-javaagent:/app/libs/opentelemetry-javaagent-2.11.0.jar"
+      # OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+      # OTEL_METRICS_EXPORTER: none
+      # OTEL_LOGS_EXPORTER: none
+      # OTEL_SERVICE_NAME: "rempms-draft-service"
+    # networks:
+      # - rempms-shared-network
+
+  # rempms-location-service:
+    # image: "maleeshasa/rempms-location-service:v4-LTS"
+    # container_name: rempms-location-service
+    # ports:
+      # - "8084:8084"
+    # healthcheck:
+      # test: "curl --fail --silent localhost:8084/actuator/health/readiness | grep UP || exit 1"
+      # interval: 20s
+      # timeout: 20s
+      # retries: 20
+      # start_period: 10s
+    # depends_on:
+      # rempms-rabbitmq:
+        # condition: service_healthy
+      # rempms-eureka-service:
+        # condition: service_healthy
+      # rempms-configuration-service:
+        # condition: service_healthy
+      # postgresqldb:
+        # condition: service_healthy
+    # environment:
+      # SPRING_PROFILES_ACTIVE: prod
+      # SPRING_APPLICATION_NAME: rempms-location-service
+      # EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://rempms-eureka-service:8070/eureka/
+      # SPRING_RABBITMQ_HOST: rempms-rabbitmq
+      # POSTGRES_SERVER_ADDRESS: postgresqldb
+      # CONFIG_SERVER_URL: http://rempms-configuration-service:8071/
+      # JAVA_TOOL_OPTIONS: "-javaagent:/app/libs/opentelemetry-javaagent-2.11.0.jar"
+      # OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+      # OTEL_METRICS_EXPORTER: none
+      # OTEL_LOGS_EXPORTER: none
+      # OTEL_SERVICE_NAME: "rempms-location-service"
+    # networks:
+      # - rempms-shared-network
+
+  # rempms-recruitment-service:
+    # image: "maleeshasa/rempms-recruitment-service:v4-LTS"
+    # container_name: rempms-recruitment-service
+    # ports:
+      # - "8086:8086"
+    # healthcheck:
+      # test: "curl --fail --silent localhost:8086/actuator/health/readiness | grep UP || exit 1"
+      # interval: 20s
+      # timeout: 20s
+      # retries: 20
+      # start_period: 10s
+    # depends_on:
+      # rempms-rabbitmq:
+        # condition: service_healthy
+      # rempms-eureka-service:
+        # condition: service_healthy
+      # rempms-configuration-service:
+        # condition: service_healthy
+      # postgresqldb:
+        # condition: service_healthy
+    # environment:
+      # SPRING_PROFILES_ACTIVE: prod
+      # SPRING_APPLICATION_NAME: rempms-recruitment-service
+      # EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://rempms-eureka-service:8070/eureka/
+      # SPRING_RABBITMQ_HOST: rempms-rabbitmq
+      # POSTGRES_SERVER_ADDRESS: postgresqldb
+      # CONFIG_SERVER_URL: http://rempms-configuration-service:8071/
+      # JAVA_TOOL_OPTIONS: "-javaagent:/app/libs/opentelemetry-javaagent-2.11.0.jar"
+      # OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+      # OTEL_METRICS_EXPORTER: none
+      # OTEL_LOGS_EXPORTER: none
+      # OTEL_SERVICE_NAME: "rempms-recruitment-service"
+    # networks:
+      # - rempms-shared-network
+
+  # rempms-notification-service:
+    # image: "maleeshasa/rempms-notification-service:v4-LTS"
+    # container_name: rempms-notification-service
+    # ports:
+      # - "2222:2222"
+    # healthcheck:
+      # test: "curl --fail --silent localhost:9001/actuator/health/readiness | grep UP || exit 1"
+      # interval: 20s
+      # timeout: 20s
+      # retries: 20
+      # start_period: 10s
+    # depends_on:
+      # rempms-eureka-service:
+        # condition: service_healthy
+      # rempms-configuration-service:
+        # condition: service_healthy
+    # environment:
+      # SPRING_PROFILES_ACTIVE: prod
+      # SPRING_APPLICATION_NAME: rempms-notification-service
+      # EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://rempms-eureka-service:8070/eureka/
+      # POSTGRES_SERVER_ADDRESS: postgresqldb
+      # CONFIG_SERVER_URL: http://rempms-configuration-service:8071/
+      # JAVA_TOOL_OPTIONS: "-javaagent:/app/libs/opentelemetry-javaagent-2.11.0.jar"
+      # OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+      # OTEL_METRICS_EXPORTER: none
+      # OTEL_LOGS_EXPORTER: none
+      # OTEL_SERVICE_NAME: "rempms-notification-service"
+      # SPRING_CLOUD_STREAM_KAFKA_BINDER_BROKERS: "rempms-kafka:9092"
+    # networks:
+      # - rempms-shared-network
+
+  rempms-candidate-fe:
+    image: "maleeshasa/rempms-candidate-fe:v4-LTS"
+    container_name: "rempms-candidate-fe"
+    ports:
+      - "8080:80"
+    networks:
+      - rempms-shared-network
+      
+  # rempms-recruitment-fe:
+    # image: "maleeshasa/rempms-recruitment-fe:v4-LTS"
+    # container_name: "rempms-recruitment-fe"
+    # ports:
+      # - "8181:81"
+    # networks:
+      # - rempms-shared-network
+                
+  # user-management-fe:
+    # image: "maleeshasa/user-management-fe:v4-LTS"
+    # container_name: "user-management-fe"
+    # ports:
+      # - "8282:82"
+    # networks:
+      # - rempms-shared-network
+      
+networks:
+  rempms-shared-network:
+    name: rempms-shared-network
+    driver: bridge

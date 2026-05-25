@@ -1,0 +1,13 @@
+
+spring:
+  data:
+    mongodb:
+      host: localhost
+      port: 27017
+      database: rempms-draft_management
+#      username: mongo
+#      password: 123
+#      authentication-database: admin
+
+security:
+  authorization: "disabled"

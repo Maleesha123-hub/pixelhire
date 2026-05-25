@@ -1,0 +1,26 @@
+spring:
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/rempms_notification_management
+    username: postgres
+    password: rempmsprod@123
+  sql:
+    init:
+      mode: ALWAYS  # only if you have schema/data SQL files      ALWAYS | NEVER |
+      schema-locations: classpath:sql/schema.sql
+
+logging:
+  level:
+    org.springframework.r2dbc.connection: DEBUG
+    org.springframework.data.r2dbc.core: DEBUG
+    io.r2dbc.postgresql.QUERY: DEBUG
+    io.r2dbc.postgresql.PARAM: DEBUG
+
+
+message:
+  service:
+    base:
+      url: http://localhost:2991
+
+email:
+  retry:
+    count: 3

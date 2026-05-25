@@ -1,0 +1,82 @@
+global:
+  scrape_interval:     5s # Set the scrape interval to every 5 seconds. fetch metrics data by every 5 sec.
+  evaluation_interval: 5s # Evaluate rules every 5 seconds. re-evaluate metrics data by every 5 sec.
+
+scrape_configs:
+  - job_name: 'rempms-configuration-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'rempms-configuration-service:8071' ]
+      
+  - job_name: 'rempms-communication-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'rempms-communication-service:8083' ]
+      
+  - job_name: 'rempms-eureka-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'rempms-eureka-service:8070' ]
+      
+  - job_name: 'rempms-candidate-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'rempms-candidate-service:8088' ]
+      
+  - job_name: 'rempms-recruitment-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'rempms-recruitment-service:8086' ]
+      
+  - job_name: 'rempms-document-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'rempms-document-service:8087' ]
+      
+  - job_name: 'rempms-location-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'rempms-location-service:8084' ]
+      
+  - job_name: 'rempms-api-gateway-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'rempms-api-gateway-service:8081' ]
+      
+  - job_name: 'rempms-draft-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'rempms-draft-service:8186' ]
+      
+  - job_name: 'pdev-user-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'pdev-user-service:9001' ]
+      
+  - job_name: 'pdev-keycloak-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'pdev-keycloak-service:8823' ]
+      
+  - job_name: 'rempms-notification-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'rempms-notification-service:2222' ]
+      
+  - job_name: 'user-management-fe'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'user-management-fe:8282' ]
+      
+  - job_name: 'rempms-recruitment-fe'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'rempms-recruitment-fe:8181' ]
+      
+  - job_name: 'rempms-candidate-fe'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'rempms-candidate-fe:8080' ]
+      
+
+  

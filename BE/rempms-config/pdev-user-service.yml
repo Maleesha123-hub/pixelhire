@@ -1,0 +1,103 @@
+server:
+  port: 9001
+
+spring:
+  cloud:
+    circuitbreaker:
+      enabled: true
+      retry:
+        enabled: true
+
+    openfeign:
+      okhttp:
+        enabled: true
+
+    stream:
+      default-binder: kafka
+      kafka:
+        binder:
+          brokers:
+            - localhost:9094
+          autoCreateTopics: true
+      bindings:
+        userRegistrationEmail-out-0:
+          destination: user-registration-email
+          content-type: application/json
+        emailVerificationUrl-out-0:
+          destination: email-verification-url
+          content-type: application/json
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8070/eureka/
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      probes:
+        enabled: true
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      enabled: true
+      application: ${spring.application.name}
+
+logging:
+  level:
+    org:
+      springframework:
+        cloud: DEBUG
+  pattern:
+    level: "%5p [${spring.application.name},%X{trace_id},%X{span_id}]"
+
+resilience4j.circuitbreaker:
+  configs:
+    default:
+      slidingWindowSize: 10
+      waitDurationInOpenState: 10s
+      permittedNumberOfCallsInHalfOpenState: 2
+      failureRateThreshold: 50
+      slowCallRateThreshold: 50
+      slowCallDurationThreshold: 10s
+      maxWaitDurationInHalfOpenState: 0s
+
+resilience4j.retry:
+  configs:
+    default:
+      max-attempts: 3                # Total number of attempts (initial + 2 retries)
+      wait-duration: 5s              # Wait time between retries
+      retry-exceptions:
+        - com.pdev.user_service.exception.FeignCustomException
+      exponential-backoff:
+        enabled: true
+        multiplier: 2               # Doubles wait duration on each retry
+        max-wait-duration: 10s      # Caps wait duration between retries
+
+one:
+  time:
+    password:
+      CHAR_POOL: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*+=-_"
+      PASSWORD_LENGTH: 8
+
+email:
+  verification:
+    link: "http://localhost:4200/#/verify-email?uid="

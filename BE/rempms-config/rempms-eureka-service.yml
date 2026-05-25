@@ -1,0 +1,46 @@
+server:
+  port: 8070
+
+spring:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  health:
+    liveness-state:
+      enabled: true
+    readiness-state:
+      enabled: true
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      enabled: true
+      application: ${spring.application.name}
+
+logging:
+  level:
+    org:
+      springframework:
+        cloud: DEBUG
+  pattern:
+    level: "%5p [${spring.application.name},%X{trace_id},%X{span_id}]"
+
+eureka:
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: "http://${eureka.instance.hostname}:${server.port}/eureka/"
+  instance:
+    prefer-ip-address: true
+    hostname: localhost

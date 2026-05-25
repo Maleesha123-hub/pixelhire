@@ -1,0 +1,76 @@
+server:
+  port: 8086
+
+spring:
+  cloud:
+    circuitbreaker:
+      enabled: true
+      retry:
+        enabled: true
+    openfeign:
+      okhttp:
+        enabled: true
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8070/eureka/
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  health:
+    liveness-state:
+      enabled: true
+    readiness-state:
+      enabled: true
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      enabled: true
+      application: ${spring.application.name}
+
+logging:
+  level:
+    org:
+      springframework:
+        cloud: DEBUG
+  pattern:
+    level: "%5p [${spring.application.name},%X{trace_id},%X{span_id}]"
+
+resilience4j.circuitbreaker:
+  configs:
+    default:
+      slidingWindowSize: 10
+      waitDurationInOpenState: 10s
+      permittedNumberOfCallsInHalfOpenState: 2
+      failureRateThreshold: 50
+      slowCallRateThreshold: 50
+      slowCallDurationThreshold: 10s
+      maxWaitDurationInHalfOpenState: 0s
+
+resilience4j.retry:
+  configs:
+    default:
+      max-attempts: 3                # Total number of attempts (initial + 2 retries)
+      wait-duration: 5s              # Wait time between retries
+      retry-exceptions:
+        - com.pdev.rempms.recruitmentservice.exception.FeignCustomException
+      exponential-backoff:
+        enabled: true
+        multiplier: 2               # Doubles wait duration on each retry
+        max-wait-duration: 10s      # Caps wait duration between retries

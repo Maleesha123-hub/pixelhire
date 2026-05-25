@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.rempms</groupId>
+	<artifactId>rempms-bom</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<description>Common BOM for rempms microservices</description>
+	<packaging>pom</packaging>
+	<url>www.rempms.com</url>
+	<licenses>
+		<license>
+			<name>Apache License, Version 2.0</name>
+			<url>https://www.apache.org/licenses/LICENSE-2.0</url>
+		</license>
+	</licenses>
+	<developers>
+		<developer>
+			<name>Maleesha Sandakalum</name>
+			<email>founder@rempms.com</email>
+			<organization>rempms</organization>
+			<organizationUrl>www.rempms.com</organizationUrl>
+		</developer>
+	</developers>
+	<scm>
+		<url>https://github.com/rempms/microservices</url>
+	</scm>
+
+	<properties>
+		<common-lib.version>1.0.0</common-lib.version>
+		<spring-boot.version>3.5.0</spring-boot.version>
+		<java.version>21</java.version>
+		<maven.compiler.source>21</maven.compiler.source>
+		<maven.compiler.target>21</maven.compiler.target>
+		<spring-cloud.version>2025.0.0</spring-cloud.version>
+		<spring-doc.version>2.8.1</spring-doc.version>
+		<h2.version>2.3.232</h2.version>
+		<lombok.version>1.18.36</lombok.version>
+		<otel.version>2.11.0</otel.version>
+		<micrometer.version>1.14.2</micrometer.version>
+		<jib.version>3.4.5</jib.version>
+		<image.tag>v4-LTS</image.tag>
+		<postgresql.version>42.7.2</postgresql.version>
+		<r2dbc-postgresql.version>1.1.0.RELEASE</r2dbc-postgresql.version>
+		<modelmapper.version>2.3.5</modelmapper.version>
+		<jackson-datatype-jsr310.version>2.13.4</jackson-datatype-jsr310.version>
+		<spring-cloud-starter-openfeign.version>4.0.3</spring-cloud-starter-openfeign.version>
+		<feign-okhttp.version>12.4</feign-okhttp.version>
+		<jakarta.servlet-api.version>6.0.0</jakarta.servlet-api.version>
+		<jjwt-api.version>0.12.6</jjwt-api.version>
+		<jjwt-impl.version>0.12.6</jjwt-impl.version>
+		<jjwt-jackson.version>0.12.6</jjwt-jackson.version>
+		<maven-surefire-plugin.version>3.2.2</maven-surefire-plugin.version>
+		<commons-io.version>2.11.0</commons-io.version>
+		<poi.version>5.2.2</poi.version>
+		<poi-ooxml.version>5.2.2</poi-ooxml.version>
+		<html2pdf.version>3.0.1</html2pdf.version>
+		<kernel.version>7.1.18</kernel.version>
+		<javax.servlet-api.version>4.0.1</javax.servlet-api.version>
+	</properties>
+
+	<modules>
+		<!--        <module>rempms-common</module>-->
+	</modules>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-dependencies</artifactId>
+				<version>${spring-boot.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.projectlombok</groupId>
+				<artifactId>lombok</artifactId>
+				<version>${lombok.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.springdoc</groupId>
+				<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+				<version>${spring-doc.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-starter-test</artifactId>
+				<version>${spring-boot.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+	<build>
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-maven-plugin</artifactId>
+					<version>${spring-boot.version}</version>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+	</build>
+
+</project>

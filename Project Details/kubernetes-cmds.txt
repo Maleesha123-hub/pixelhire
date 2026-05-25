@@ -1,0 +1,72 @@
+kubectl config get-contexts
+kubectl config get-clusters
+kubectl config use-context docker-desktop
+kubectl get nodes
+
+wsl --shutdown
+
+*** To install helm package manager, install chocolatey package manager
+https://chocolatey.org/install
+choco
+
+*** Helm install
+scoop install helm
+
+# Add kubernetes-dashboard repository
+helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
+# Deploy a Helm Release named "kubernetes-dashboard" using the kubernetes-dashboard chart
+helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard --create-namespace --namespace kubernetes-dashboard
+
+kubectl -n kubernetes-dashboard port-forward svc/kubernetes-dashboard-kong-proxy 8443:443
+
+# Create a sample user
+https://github.com/kubernetes/dashboard/blob/master/docs/user/access-control/creating-sample-user.md
+
+*** service account token
+kubectl -n kubernetes-dashboard create token admin-user
+# long lived token
+kubectl describe secret admin-user -n kubernetes-dashboard
+
+kubectl get deployments
+kubectl get services
+kubectl get replicaset
+kubectl get pods
+kubectl get pods -A   // Want me to check which Pods are running before deletion?
+
+# Rollout inside Kubernetes cluster
+kubectl scale deployment accounts-deployment --replicas=1
+
+# All the events up to now in cluster
+kubectl get events --sort-by=.metadata.creationTimestamp
+
+kubectl describe pod gatewayserver-deployment-6776d7dd85-wfgv6
+
+kubectl rollout history deployment gatewayserver-deployment
+kubectl rollout undo deployment gatewayserver-deployment --to-revision=1
+kubectl delete -f 1_keycloak.yaml
+
+*** Helm charts ***
+helm create accounts
+helm dependencies build
+helm create dev-env
+
+*** Helm template command
+helm template .
+helm install keycloak keycloak
+helm list -A
+helm uninstall keycloak -n default
+
+*** Powershell keycloak cmd
+helm install keycloak keycloak
+
+# Get the Keycloak service IP
+$SERVICE_IP = kubectl get svc keycloak -n default -o jsonpath="{.status.loadBalancer.ingress[0].ip}"
+
+# Define the port
+$SERVICE_PORT = 8080
+
+# Print the URL
+Write-Output "http://${SERVICE_IP}:${SERVICE_PORT}/"
+
+kubectl edit sts  keycloak-postgresql
+

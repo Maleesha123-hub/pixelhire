@@ -1,0 +1,13 @@
+spring: 
+  thymeleaf:
+    prefix: "file:src/main/resources/template/"
+
+document:
+  base:
+    file:
+      path: C:\document-data\
+    font:
+      path: "src/main/resources/fonts/TheSansSemiLight Plain.ttf"
+  max:
+    image: 4000000
+    document: 50000000

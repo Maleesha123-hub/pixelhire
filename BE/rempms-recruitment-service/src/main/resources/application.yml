@@ -1,0 +1,8 @@
+spring:
+  profiles:
+    active: prod
+  application:
+    name: rempms-recruitment-service
+
+  config:
+    import: "configserver:${CONFIG_SERVER_URL:http://localhost:8071/}"
